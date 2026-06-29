@@ -40,6 +40,13 @@ function normalizeTags(text) {
     .filter(Boolean);
 }
 
+function usernameToInternalEmail(username) {
+  const normalized = username.trim().toLowerCase();
+  const bytes = new TextEncoder().encode(normalized);
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `u-${hex || "guest"}@xuexue.example.com`;
+}
+
 function buildSummary(categoryName, items, profile) {
   const categoryItems = items.filter((item) => item.category_name === categoryName);
   const tagCounts = new Map();
@@ -67,7 +74,7 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [authMode, setAuthMode] = useState("login");
-  const [authForm, setAuthForm] = useState({ email: "", password: "", username: "" });
+  const [authForm, setAuthForm] = useState({ password: "", username: "" });
   const [tab, setTab] = useState("home");
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -169,11 +176,18 @@ export default function App() {
     setAuthNotice("");
     setLoading(true);
     try {
-      const payload = { email: authForm.email.trim(), password: authForm.password };
+      const username = authForm.username.trim();
+      if (!username) {
+        const message = "请先输入姓名/昵称。";
+        setAuthNotice(message);
+        return showToast(message);
+      }
+
+      const payload = { email: usernameToInternalEmail(username), password: authForm.password };
       const result =
         authMode === "login"
           ? await supabase.auth.signInWithPassword(payload)
-          : await supabase.auth.signUp({ ...payload, options: { data: { username: authForm.username.trim() || payload.email.split("@")[0] } } });
+          : await supabase.auth.signUp({ ...payload, options: { data: { username } } });
 
       if (result.error) {
         setAuthNotice(result.error.message);
@@ -185,7 +199,7 @@ export default function App() {
           ? "登录成功，正在进入知识库。"
           : result.data.session
             ? "注册成功，正在进入知识库。"
-            : "注册成功。如果页面没有进入首页，请先到 Supabase 关闭邮箱验证，或去邮箱点确认链接。";
+            : "注册成功。如果页面没有进入首页，请先到 Supabase 关闭邮箱验证。";
       setAuthNotice(message);
       showToast(message);
     } catch (error) {
@@ -399,8 +413,7 @@ function AuthPage({ mode, setMode, form, setForm, onSubmit, loading, notice }) {
       <form className="auth-card" onSubmit={onSubmit}>
         <p className="eyebrow">多人协作小知识库</p>
         <h1>雪雪老师小知识</h1>
-        {mode === "signup" && <input placeholder="显示名称，例如阿婷" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />}
-        <input type="email" placeholder="邮箱" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+        <input placeholder="姓名/昵称，例如阿婷" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
         <input type="password" placeholder="密码" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} />
         <button type="submit" className="primary" disabled={loading}>{loading ? "处理中..." : mode === "login" ? "登录" : "注册"}</button>
         <button type="button" className="ghost" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
