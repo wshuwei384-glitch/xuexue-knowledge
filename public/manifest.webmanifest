@@ -1,0 +1,17 @@
+{
+  "name": "雪门备忘录",
+  "short_name": "雪门",
+  "description": "多人协作备忘录",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7fbf4",
+  "theme_color": "#78d4bd",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
