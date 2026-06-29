@@ -77,6 +77,7 @@ export default function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [filters, setFilters] = useState({ q: "", category: "", tag: "", importance: "", status: "" });
   const [toast, setToast] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
   const [loading, setLoading] = useState(false);
 
   const todayCount = useMemo(() => {
@@ -165,15 +166,35 @@ export default function App() {
 
   async function handleAuth(event) {
     event.preventDefault();
+    setAuthNotice("");
     setLoading(true);
-    const payload = { email: authForm.email, password: authForm.password };
-    const result =
-      authMode === "login"
-        ? await supabase.auth.signInWithPassword(payload)
-        : await supabase.auth.signUp({ ...payload, options: { data: { username: authForm.username } } });
-    setLoading(false);
-    if (result.error) return showToast(result.error.message);
-    showToast(authMode === "login" ? "欢迎回来，今天也抓住小知识" : "注册成功，请继续登录或查收确认邮件");
+    try {
+      const payload = { email: authForm.email.trim(), password: authForm.password };
+      const result =
+        authMode === "login"
+          ? await supabase.auth.signInWithPassword(payload)
+          : await supabase.auth.signUp({ ...payload, options: { data: { username: authForm.username.trim() || payload.email.split("@")[0] } } });
+
+      if (result.error) {
+        setAuthNotice(result.error.message);
+        return showToast(result.error.message);
+      }
+
+      const message =
+        authMode === "login"
+          ? "登录成功，正在进入知识库。"
+          : result.data.session
+            ? "注册成功，正在进入知识库。"
+            : "注册成功。如果页面没有进入首页，请先到 Supabase 关闭邮箱验证，或去邮箱点确认链接。";
+      setAuthNotice(message);
+      showToast(message);
+    } catch (error) {
+      const message = error?.message || "登录/注册没有成功，请检查 Supabase 配置。";
+      setAuthNotice(message);
+      showToast(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function saveItem(event) {
@@ -326,7 +347,7 @@ export default function App() {
   }
 
   if (!hasSupabaseConfig) return <SetupNotice />;
-  if (!session || !profile) return <AuthPage mode={authMode} setMode={setAuthMode} form={authForm} setForm={setAuthForm} onSubmit={handleAuth} loading={loading} />;
+  if (!session || !profile) return <AuthPage mode={authMode} setMode={setAuthMode} form={authForm} setForm={setAuthForm} onSubmit={handleAuth} loading={loading} notice={authNotice} />;
 
   return (
     <div className="app-shell">
@@ -372,7 +393,7 @@ function SetupNotice() {
   );
 }
 
-function AuthPage({ mode, setMode, form, setForm, onSubmit, loading }) {
+function AuthPage({ mode, setMode, form, setForm, onSubmit, loading, notice }) {
   return (
     <section className="auth-page">
       <form className="auth-card" onSubmit={onSubmit}>
@@ -381,10 +402,11 @@ function AuthPage({ mode, setMode, form, setForm, onSubmit, loading }) {
         {mode === "signup" && <input placeholder="显示名称，例如阿婷" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />}
         <input type="email" placeholder="邮箱" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
         <input type="password" placeholder="密码" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} />
-        <button className="primary" disabled={loading}>{mode === "login" ? "登录" : "注册"}</button>
+        <button type="submit" className="primary" disabled={loading}>{loading ? "处理中..." : mode === "login" ? "登录" : "注册"}</button>
         <button type="button" className="ghost" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
           {mode === "login" ? "还没有账号，去注册" : "已有账号，去登录"}
         </button>
+        {notice && <p className="auth-notice">{notice}</p>}
       </form>
     </section>
   );
