@@ -6,11 +6,11 @@ import { downloadText, toCsv } from "./lib/csv";
 const emptyForm = {
   title: "",
   content: "",
-  category_name: "心内科",
+  category_name: "中医",
   new_category: "",
   tags_text: "",
   importance: "普通",
-  source_scene: "上课",
+  source_scene: "门诊",
   personal_note: "",
   status: "未复习"
 };
@@ -161,8 +161,12 @@ export default function App() {
       showToast(itemRes.error?.message || categoryRes.error?.message || summaryRes.error?.message);
       return;
     }
-    setItems(itemRes.data || []);
-    setCategories(categoryRes.data?.length ? categoryRes.data : DEFAULT_CATEGORIES.map((name) => ({ name })));
+    setItems((itemRes.data || []).map((item) => ({
+      ...item,
+      category_name: DEFAULT_CATEGORIES.includes(item.category_name) ? item.category_name : "中医",
+      source_scene: SCENES.includes(item.source_scene) ? item.source_scene : "门诊"
+    })));
+    setCategories(DEFAULT_CATEGORIES.map((name) => ({ name })));
     setSummaries(summaryRes.data || []);
   }
 
@@ -213,7 +217,7 @@ export default function App() {
 
   async function saveItem(event) {
     event.preventDefault();
-    const categoryName = form.new_category.trim() || form.category_name;
+    const categoryName = form.category_name;
     const payload = {
       title: form.title.trim(),
       content: form.content.trim(),
@@ -242,7 +246,6 @@ export default function App() {
           .single();
 
     if (result.error) return showToast(result.error.message);
-    if (form.new_category.trim()) await addCategory(form.new_category.trim(), false);
     setForm({ ...emptyForm, category_name: categoryName });
     setEditingItem(null);
     setSelectedItem(null);
@@ -314,11 +317,11 @@ export default function App() {
     setForm({
       title: item.title || "",
       content: item.content || "",
-      category_name: item.category_name || "心内科",
+      category_name: DEFAULT_CATEGORIES.includes(item.category_name) ? item.category_name : "中医",
       new_category: "",
       tags_text: (item.tags || []).join("，"),
       importance: item.importance || "普通",
-      source_scene: item.source_scene || "上课",
+      source_scene: item.source_scene || "门诊",
       personal_note: item.personal_note || "",
       status: item.status || "未复习"
     });
@@ -343,10 +346,10 @@ export default function App() {
     const payload = rows.map((row) => ({
       title: row.title || "",
       content: row.content || "",
-      category_name: row.category_name || row.category || "杂项",
+      category_name: DEFAULT_CATEGORIES.includes(row.category_name || row.category) ? (row.category_name || row.category) : "中医",
       tags: Array.isArray(row.tags) ? row.tags : normalizeTags(row.tags || ""),
       importance: row.importance || "普通",
-      source_scene: row.source_scene || "其他",
+      source_scene: SCENES.includes(row.source_scene) ? row.source_scene : "门诊",
       personal_note: row.personal_note || "",
       status: row.status || "未复习",
       created_by_user_id: profile.id,
@@ -461,15 +464,14 @@ function RecordForm({ form, setForm, categories, editingItem, onCancel, onSubmit
       <textarea placeholder="老师原话/知识点正文，必填" value={form.content} onChange={(e) => update("content", e.target.value)} required rows={7} />
       <div className="two-col">
         <select value={form.category_name} onChange={(e) => update("category_name", e.target.value)}>{categories.map((category) => <option key={category.name}>{category.name}</option>)}</select>
-        <input placeholder="新分类，可选" value={form.new_category} onChange={(e) => update("new_category", e.target.value)} />
+        <select value={form.source_scene} onChange={(e) => update("source_scene", e.target.value)}>{SCENES.map((x) => <option key={x}>{x}</option>)}</select>
       </div>
       <input placeholder="标签，用逗号分隔，例如 AMI，心衰" value={form.tags_text} onChange={(e) => update("tags_text", e.target.value)} />
       <div className="two-col">
         <select value={form.importance} onChange={(e) => update("importance", e.target.value)}>{IMPORTANCE.map((x) => <option key={x}>{x}</option>)}</select>
-        <select value={form.source_scene} onChange={(e) => update("source_scene", e.target.value)}>{SCENES.map((x) => <option key={x}>{x}</option>)}</select>
+        <select value={form.status} onChange={(e) => update("status", e.target.value)}>{STATUSES.map((x) => <option key={x}>{x}</option>)}</select>
       </div>
       <textarea placeholder="自己的理解或补充，可选" value={form.personal_note} onChange={(e) => update("personal_note", e.target.value)} rows={4} />
-      <select value={form.status} onChange={(e) => update("status", e.target.value)}>{STATUSES.map((x) => <option key={x}>{x}</option>)}</select>
       <div className="actions"><button className="primary">保存</button>{editingItem && <button type="button" onClick={onCancel}>取消编辑</button>}</div>
     </form>
   );
@@ -540,33 +542,22 @@ function Detail({ item, profile, startEdit, deleteItem, setItemStatus, onBack })
   );
 }
 
-function SummariesPage({ categories, items, summaries, profile, addCategory, renameCategory, deleteCategory, updateSummary }) {
-  const [newName, setNewName] = useState("");
-  const [renameMap, setRenameMap] = useState({});
-
+function SummariesPage({ categories, items, summaries, updateSummary }) {
   return (
     <>
       <section className="category-manager">
-        <div className="card-head"><h2>分类管理</h2><span>{profile.role === "admin" ? "管理员" : "成员"}</span></div>
-        <div className="filter-row">
-          <input placeholder="新增分类" value={newName} onChange={(e) => setNewName(e.target.value)} />
-          <button className="primary" onClick={() => { addCategory(newName); setNewName(""); }}>新增</button>
-        </div>
+        <div className="card-head"><h2>分类总结</h2><span>中医 / 西医</span></div>
       </section>
       <section className="summary-grid">
         {categories.map((category) => {
           const summary = summaries.find((row) => row.category_name === category.name);
           const count = items.filter((item) => item.category_name === category.name).length;
-          const canManage = profile.role === "admin";
           return (
             <article className="summary-card" key={category.name}>
               <div className="card-head"><h3>{category.name}</h3><span>{count} 条</span></div>
               {summary ? <SummaryBody summary={summary} /> : <p>还没有总结，小知识正在排队。</p>}
               <div className="actions wrap">
                 <button className="primary" onClick={() => updateSummary(category.name)}>更新总结</button>
-                {canManage && category.id && <input className="rename-input" placeholder="输入新分类名" value={renameMap[category.id] || ""} onChange={(e) => setRenameMap({ ...renameMap, [category.id]: e.target.value })} />}
-                {canManage && category.id && <button onClick={() => renameCategory(category, renameMap[category.id] || "")}>改名</button>}
-                {profile.role === "admin" && category.id && <button className="danger" onClick={() => deleteCategory(category)}>删除</button>}
               </div>
             </article>
           );
