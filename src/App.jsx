@@ -371,8 +371,8 @@ export default function App() {
       {toast && <div className="toast">{toast}</div>}
       <header className="topbar">
         <div>
-          <p className="eyebrow">雪花小本本</p>
-          <h1>雪雪老师小知识</h1>
+          <p className="eyebrow">多人协作备忘录</p>
+          <h1>雪门备忘录</h1>
         </div>
         <button className="user-pill" onClick={() => setTab("settings")}>{profile.username}</button>
       </header>
@@ -414,8 +414,8 @@ function AuthPage({ mode, setMode, form, setForm, onSubmit, loading, notice }) {
   return (
     <section className="auth-page">
       <form className="auth-card" onSubmit={onSubmit}>
-        <p className="eyebrow">多人协作小知识库</p>
-        <h1>雪雪老师小知识</h1>
+        <p className="eyebrow">多人协作备忘录</p>
+        <h1>雪门备忘录</h1>
         <input placeholder="姓名/昵称，例如阿婷" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
         <input type="password" placeholder="密码" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} />
         <button type="submit" className="primary" disabled={loading}>{loading ? "处理中..." : mode === "login" ? "登录" : "注册"}</button>
